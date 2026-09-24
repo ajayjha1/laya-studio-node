@@ -1094,6 +1094,8 @@ Guidelines: keep the runtime dependency count at zero, do not invent Laya API su
 
 ## License
 
-Apache-2.0 — matching the Laya model's license.
+MIT — see [LICENSE](LICENSE).
+
+Laya itself is Apache-2.0. `laya-studio` is an independent Node.js client that talks to Laya over HTTP; it contains no Laya code, so the two licenses apply separately.
 
 Laya is built by [Convai Innovations](https://huggingface.co/convaiinnovations). This package is an independent Node.js client and is not affiliated with them.
