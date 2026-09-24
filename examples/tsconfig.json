@@ -1,0 +1,16 @@
+{
+  // Examples import "laya-studio" by name, which TypeScript resolves through
+  // this package's own `exports` map. That means they typecheck against the
+  // built `dist/*.d.ts` — a real check that the published types are usable.
+  // Run `npm run build` first.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "noUnusedLocals": false
+  },
+  "include": ["."],
+  // These two import express/fastify, which are optional and deliberately not
+  // installed here — the integrations type those frameworks structurally, so
+  // the package itself never needs them. Install express/fastify to check them.
+  "exclude": ["08-express.ts", "09-fastify.ts"]
+}

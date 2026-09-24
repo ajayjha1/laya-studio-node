@@ -1,0 +1,85 @@
+{
+  "name": "laya-studio",
+  "version": "0.1.0",
+  "description": "Node.js/TypeScript developer toolkit for using Laya as a fast decision layer in AI applications.",
+  "keywords": [
+    "laya",
+    "system-one",
+    "classification",
+    "routing",
+    "decision-model",
+    "llm",
+    "ai-agents",
+    "mcp",
+    "typescript"
+  ],
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CONTRIBUTING.md",
+    "docs"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "laya": "./dist/cli.js",
+    "laya-mcp": "./dist/mcp.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./express": {
+      "types": "./dist/express.d.ts",
+      "import": "./dist/express.js",
+      "require": "./dist/express.cjs"
+    },
+    "./fastify": {
+      "types": "./dist/fastify.d.ts",
+      "import": "./dist/fastify.js",
+      "require": "./dist/fastify.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build && npm run typecheck:examples",
+    "typecheck:examples": "tsc -p examples/tsconfig.json"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@typescript-eslint/eslint-plugin": "^8.18.0",
+    "@typescript-eslint/parser": "^8.18.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajayjha1/laya-studio-node.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ajayjha1/laya-studio-node/issues"
+  },
+  "homepage": "https://github.com/ajayjha1/laya-studio-node#readme"
+}
