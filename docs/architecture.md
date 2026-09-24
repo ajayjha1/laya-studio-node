@@ -160,6 +160,16 @@ Stated plainly, because the absence shapes the design:
   names are a fixed set (`KNOWN_MODELS`): `english`, `multilingual`,
   `typed-decisions`.
 - **No streaming.** Laya is non-autoregressive; there is nothing to stream.
+- **No extraction primitive.** Laya answers `choice`, `score` and `noul` — it
+  cannot pull a typed value (an email, an amount, a date) out of free text.
+  A client could bolt regex extraction onto a validation question, but that
+  would be this package inventing a capability and presenting it as Laya's, so
+  `laya-studio` does not offer an `extract` operation.
+- **No candidate ranking over HTTP.** Laya's `shortlist.py` ranks
+  high-cardinality options, but it does so with **embeddings via
+  `embed_fn_from_agent`** — an in-process Python helper. `/v1/systemone`
+  exposes no embedding or ranking route, so `find`/`rerank` operations cannot
+  be implemented faithfully from Node and are deliberately absent.
 - **No server-side timing breakdown.** Network time and inference time cannot
   be separated from a client, which is why `laya benchmark` reports them
   together and says so.

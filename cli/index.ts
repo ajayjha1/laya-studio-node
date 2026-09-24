@@ -30,7 +30,7 @@ ${bold('Usage')}
 ${bold('Commands')}
   predict <text>      raw questions in, raw answers out ${dim('(the canonical call)')}
   classify <text>     assign one label      ${dim('--labels billing,technical,sales')}
-  decide <text>       several typed questions in one forward pass
+  decide <text>       several typed questions in one forward pass ${dim('--preset triage')}
   score <text>        rate against an ordered rubric ${dim('--levels "low,medium,high"')}
   route <text>        show which route Laya would pick (never executes anything)
   screen <text>       yes/no guardrail checks

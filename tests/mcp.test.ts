@@ -238,6 +238,35 @@ describe('tools/call', () => {
     expect(result.content[0]!.text).toMatch(/unknown type/);
   });
 
+  it('runs a preset through laya_decide', async () => {
+    const result = await callTool(laya, 'laya_decide', {
+      input: 'I want a refund',
+      preset: 'triage',
+    });
+    const payload = JSON.parse(result.content[0]!.text) as Record<string, { type: string }>;
+    expect(Object.keys(payload)).toContain('intent');
+    expect(Object.keys(payload)).toContain('churn_risk');
+    expect(payload.frustration!.type).toBe('score');
+  });
+
+  it('rejects an unknown preset name', async () => {
+    const result = await callTool(laya, 'laya_decide', { input: 'x', preset: 'nope' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toMatch(/must be one of/);
+  });
+
+  it('requires decisions or a preset', async () => {
+    const result = await callTool(laya, 'laya_decide', { input: 'x' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toMatch(/Provide "decisions", a "preset", or both/);
+  });
+
+  it('advertises the preset enum in the laya_decide schema', () => {
+    const decide = TOOL_DEFINITIONS.find((t) => t.name === 'laya_decide')!;
+    const props = decide.inputSchema.properties as Record<string, { enum?: string[] }>;
+    expect(props.preset!.enum).toEqual(['triage', 'email', 'guard', 'moderation', 'router']);
+  });
+
   it('reports health', async () => {
     const result = await callTool(laya, 'laya_health', {});
     const payload = JSON.parse(result.content[0]!.text) as { status: string };

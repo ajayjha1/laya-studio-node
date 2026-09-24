@@ -13,7 +13,12 @@ import {
 } from './protocol.js';
 import { TOOL_DEFINITIONS, callTool } from './tools.js';
 
-const SERVER_INFO = { name: 'laya-studio', version: '0.1.0' } as const;
+// Injected at build time from package.json so it cannot drift from the release.
+declare const __LAYA_VERSION__: string;
+const SERVER_INFO = {
+  name: 'laya-studio',
+  version: typeof __LAYA_VERSION__ === 'string' ? __LAYA_VERSION__ : '0.0.0-dev',
+} as const;
 
 /**
  * MCP server exposing Laya's decision operations.

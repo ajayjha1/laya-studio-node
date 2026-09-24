@@ -1,6 +1,6 @@
 import { Laya } from '../../src/index.js';
 import { flagAll, flagBool, flagList, flagNumber, flagString, type ParsedArgs } from '../args.js';
-import { KNOWN_MODELS } from '../../src/index.js';
+import { KNOWN_MODELS, PRESET_NAMES, presets } from '../../src/index.js';
 import type { AnyResult, DecisionSpec } from '../../src/index.js';
 import { bar, bold, confidenceColor, cyan, dim, json, percent, table } from '../output.js';
 import { readInput } from '../client.js';
@@ -80,13 +80,26 @@ export async function decideCommand(laya: Laya, args: ParsedArgs): Promise<numbe
     decisions[name] = { kind: 'noul', instructions: rest };
   }
 
+  // `--preset triage` loads one of Laya's own ready-made question sets.
+  const preset = flagString(args.flags, 'preset');
+  if (preset !== undefined) {
+    if (!(PRESET_NAMES as readonly string[]).includes(preset)) {
+      throw new Error(
+        `Unknown preset ${JSON.stringify(preset)}. Available: ${PRESET_NAMES.join(', ')}`,
+      );
+    }
+    Object.assign(decisions, presets[preset as (typeof PRESET_NAMES)[number]]());
+  }
+
   // `--labels` alone is shorthand for a single choice decision.
   const labels = flagList(args.flags, 'labels');
   if (labels && Object.keys(decisions).length === 0) decisions.decision = labels;
 
   if (Object.keys(decisions).length === 0) {
     throw new Error(
-      'Describe at least one decision:\n' +
+      'Describe at least one decision, or use a preset:\n' +
+        `  laya decide "billed twice" --preset triage\n` +
+        `  (presets: ${PRESET_NAMES.join(', ')})\n\n` +
         '  laya decide "billed twice" --choice intent=billing,technical --score urgency=low,high \\\n' +
         '    --noul churn="Does the user threaten to cancel?"',
     );

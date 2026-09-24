@@ -1,4 +1,9 @@
+import { readFileSync } from 'node:fs';
+
 import { defineConfig } from 'tsup';
+
+// Single source of truth for the version the MCP server reports.
+const { version } = JSON.parse(readFileSync('./package.json', 'utf8')) as { version: string };
 
 export default defineConfig([
   {
@@ -19,6 +24,7 @@ export default defineConfig([
     // Executables: ESM only. Nothing imports these, so CJS copies and .d.ts
     // files would only add weight to the tarball.
     entry: { cli: 'cli/index.ts', mcp: 'mcp/server.ts' },
+    define: { __LAYA_VERSION__: JSON.stringify(version) },
     format: ['esm'],
     dts: false,
     sourcemap: false,

@@ -1,6 +1,6 @@
 {
   "name": "laya-studio",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Node.js/TypeScript developer toolkit for using Laya as a fast decision layer in AI applications.",
   "keywords": [
     "laya",
@@ -23,6 +23,8 @@
     "README.md",
     "LICENSE",
     "CONTRIBUTING.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "docs"
   ],
   "main": "./dist/index.cjs",

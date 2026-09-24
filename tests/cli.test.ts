@@ -225,6 +225,53 @@ describe('laya decide', () => {
   });
 });
 
+describe('laya decide --preset', () => {
+  it('runs a whole Laya preset in one request', async () => {
+    const { stdout, code } = await laya([
+      'decide',
+      'I want a refund, we were billed twice',
+      '--preset',
+      'triage',
+      '--json',
+    ]);
+    expect(code).toBe(0);
+
+    const parsed = JSON.parse(stdout) as Record<string, { raw: { type: string } }>;
+    expect(Object.keys(parsed)).toEqual([
+      'intent',
+      'is_urgent',
+      'frustration',
+      'refund_requested',
+      'churn_risk',
+    ]);
+    expect(parsed.intent!.raw.type).toBe('choice');
+    expect(parsed.frustration!.raw.type).toBe('score');
+    expect(parsed.churn_risk!.raw.type).toBe('noul');
+  });
+
+  it('names the available presets on a typo', async () => {
+    const { stderr, code } = await laya(['decide', 'x', '--preset', 'trage']);
+    expect(code).toBe(1);
+    expect(stderr).toMatch(/Unknown preset/);
+    expect(stderr).toMatch(/triage/);
+  });
+
+  it('lets explicit decisions combine with a preset', async () => {
+    const { stdout } = await laya([
+      'decide',
+      'hello',
+      '--preset',
+      'guard',
+      '--choice',
+      'extra=yes,no',
+      '--json',
+    ]);
+    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    expect(parsed).toHaveProperty('jailbreak');
+    expect(parsed).toHaveProperty('extra');
+  });
+});
+
 describe('laya screen', () => {
   it('reports flagged checks and exits 3 when screening fails', async () => {
     const { stdout, code } = await laya([

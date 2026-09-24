@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { DEFAULTS, normalizeEndpoint, resolveConfig, type LayaConfig } from '../config.js';
 import { MemoryCache, cacheKey, type LayaCache } from '../cache/index.js';
-import { LayaValidationError } from '../errors/index.js';
+import { LayaModelError, LayaValidationError } from '../errors/index.js';
 import { emit, type LayaHooks } from '../hooks/index.js';
 import { HttpTransport, type LayaTransport } from '../transport/index.js';
 import { mapWithConcurrency, settleWithConcurrency } from '../util/concurrency.js';
@@ -17,6 +17,11 @@ import {
 } from '../wire.js';
 import { specKind, toQuestion, type DecisionSpec } from '../decisions/spec.js';
 import { validateQuestions } from '../decisions/validate.js';
+import {
+  decodeSchemaAnswer,
+  planFromJsonSchema,
+  type JsonSchemaObject,
+} from '../decisions/schema.js';
 import {
   toChoiceResult,
   toNoulResult,
@@ -134,6 +139,33 @@ export interface BatchOptions extends CallOptions {
   concurrency?: number;
   /** Reject on the first failure instead of returning per-item outcomes. */
   throwOnError?: boolean;
+}
+
+export interface SchemaDecisionOptions extends CallOptions {
+  input: LayaState;
+  /** A flat JSON Schema object. Each property becomes one Laya question. */
+  schema: JsonSchemaObject;
+}
+
+/** One decoded field from {@link Laya.decideFromSchema}. */
+export interface SchemaFieldResult {
+  /** The answer, converted back to the schema's own type. */
+  value: string | number | boolean | null;
+  confidence: number;
+  /** Which question type the property compiled to. */
+  kind: 'choice' | 'score' | 'noul';
+  raw: LayaAnswer;
+  isConfident(threshold?: number): boolean;
+}
+
+export interface SchemaDecisionResult {
+  /** Property name -> decoded value, matching the schema's shape. */
+  values: Record<string, string | number | boolean | null>;
+  /** Per-property detail: confidence, question kind, and the raw answer. */
+  fields: Record<string, SchemaFieldResult>;
+  /** Properties whose answer did not clear the threshold. */
+  lowConfidence: string[];
+  meta: ResultMeta;
 }
 
 interface SystemOneResult {
@@ -587,6 +619,67 @@ export class Laya {
    */
   createRouter<H extends RouteHandlers>(options: RouterOptions<H>): LayaRouter<H> {
     return new LayaRouter(this, options);
+  }
+
+  /**
+   * Answer a flat JSON Schema in one forward pass, decoding each answer back to
+   * the schema's own type.
+   *
+   * A convenience over {@link Laya.predict}: every property compiles to one
+   * Laya question — `enum` to `choice`, `boolean` to `noul`, a bounded
+   * `integer`/`number` to `score`. Schemas Laya cannot express (free strings,
+   * arrays, nested objects, `$ref`) are rejected here with the same message
+   * Laya itself would give, rather than failing at the server.
+   *
+   * ```ts
+   * const { values } = await laya.decideFromSchema({
+   *   input: ticket,
+   *   schema: {
+   *     type: 'object',
+   *     properties: {
+   *       department: { enum: ['billing', 'technical'] },
+   *       urgency: { type: 'integer', minimum: 0, maximum: 3 },
+   *       isSpam: { type: 'boolean' },
+   *     },
+   *   },
+   * });
+   * values.department; // "billing"
+   * values.urgency;    // 2
+   * values.isSpam;     // false
+   * ```
+   */
+  async decideFromSchema(options: SchemaDecisionOptions): Promise<SchemaDecisionResult> {
+    const { input, schema, threshold, ...call } = options;
+
+    const plan = planFromJsonSchema(schema);
+    const questions: Record<string, LayaQuestion> = {};
+    for (const field of plan) questions[field.name] = field.question;
+
+    const { answers, meta } = await this.systemOne(input, questions, 'decideFromSchema', call);
+    const effectiveThreshold = threshold ?? this.threshold;
+
+    const values: Record<string, string | number | boolean | null> = {};
+    const fields: Record<string, SchemaFieldResult> = {};
+    const lowConfidence: string[] = [];
+
+    for (const field of plan) {
+      const answer = answers[field.name];
+      if (!answer) {
+        throw new LayaModelError(
+          `Laya returned no answer for schema property "${field.name}".`,
+        );
+      }
+
+      const value = decodeSchemaAnswer(field, answer);
+      const confidence = answer.answer_confidence;
+      const isConfident = (t: number = effectiveThreshold): boolean => confidence >= t;
+
+      values[field.name] = value;
+      fields[field.name] = { value, confidence, kind: field.kind, raw: answer, isConfident };
+      if (!isConfident()) lowConfidence.push(field.name);
+    }
+
+    return { values, fields, lowConfidence, meta };
   }
 
   /** `GET /health`. Throws the same typed errors as any other call. */

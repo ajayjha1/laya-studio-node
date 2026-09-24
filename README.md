@@ -34,7 +34,7 @@ result.probabilities; // { billing: 0.94, technical: 0.04, sales: 0.02 }
 
 ## Contents
 
-[Installation](#installation) · [Quick start](#quick-start) · [How it layers](#how-it-layers) · [predict()](#predict--the-canonical-call) · [Classification](#classification) · [Structured decisions](#structured-decisions) · [Routing](#routing) · [Confidence](#confidence) · [Fallback](#fallback) · [Batching](#batching) · [CLI](#cli) · [MCP](#mcp-server) · [Evaluation](#evaluation) · [Benchmarking](#benchmarking) · [Agent patterns](#agent-patterns) · [Express](#express) · [Fastify](#fastify) · [Next.js](#nextjs) · [Caching](#caching) · [Hooks](#hooks) · [Configuration](#configuration) · [Errors](#errors) · [API reference](#api-reference) · [Architecture](#architecture) · [Security](#security) · [Contributing](#contributing)
+[Installation](#installation) · [Quick start](#quick-start) · [How it layers](#how-it-layers) · [predict()](#predict--the-canonical-call) · [Classification](#classification) · [Structured decisions](#structured-decisions) · [Presets](#presets) · [Schema-driven decisions](#schema-driven-decisions) · [Routing](#routing) · [Confidence](#confidence) · [Fallback](#fallback) · [Batching](#batching) · [CLI](#cli) · [MCP](#mcp-server) · [Evaluation](#evaluation) · [Benchmarking](#benchmarking) · [Agent patterns](#agent-patterns) · [Express](#express) · [Fastify](#fastify) · [Next.js](#nextjs) · [Caching](#caching) · [Hooks](#hooks) · [Configuration](#configuration) · [Errors](#errors) · [API reference](#api-reference) · [Architecture](#architecture) · [Security](#security) · [Contributing](#contributing)
 
 ---
 
@@ -325,6 +325,98 @@ await laya.match({
 
 ---
 
+## Presets
+
+Five ready-made question sets, ported **verbatim** from Laya's own `presets.py`
+— same question names, same instructions, same criteria. A preset here produces
+byte-identical questions to Laya's CLI, so results are directly comparable.
+
+```ts
+import { Laya, presets } from 'laya-studio';
+
+const result = await laya.decide({
+  input: { message: ticketBody },
+  decisions: presets.triage(),
+});
+
+result.intent.label;          // "refund" | "technical_help" | "billing_question" | …
+result.frustration.score;     // 2.4 over four levels
+result.churn_risk.value;      // true
+```
+
+| Preset | Answers | References |
+|---|---|---|
+| `triage()` | intent, is_urgent, frustration, refund_requested, churn_risk | `message` |
+| `email(categories?)` | category, is_spam, is_phishing, urgency, needs_reply | `body` |
+| `guard()` | jailbreak, prompt_injection, sensitive_data, harm_severity, topic | `prompt` |
+| `moderation()` | toxic, harassment, threat, spam, severity | `post` |
+| `router()` | difficulty, domain, needs_tools, is_sensitive | `request` |
+
+Each preset's wording references a state key, so pass a matching object —
+`{ message: … }` for `triage`, `{ prompt: … }` for `guard`. Plain text works too.
+
+`email()` takes custom categories; the rest of its questions stay intact:
+
+```ts
+presets.email({ billing: 'invoices', abuse: 'spam and phishing' });
+```
+
+A whole preset is **one request, one forward pass**. From the CLI:
+
+```bash
+laya decide "billed twice, we will cancel" --preset triage
+```
+
+---
+
+## Schema-driven decisions
+
+Give a flat JSON Schema and get values back in the schema's own types.
+
+```ts
+const { values, fields, lowConfidence } = await laya.decideFromSchema({
+  input: ticket,
+  schema: {
+    type: 'object',
+    properties: {
+      department: { enum: ['billing', 'technical', 'sales'], description: 'Which team?' },
+      urgency:    { type: 'integer', minimum: 0, maximum: 3 },
+      isSpam:     { type: 'boolean' },
+    },
+  },
+});
+
+values.department;  // "billing"
+values.urgency;     // 2        — a number, not a level index
+values.isSpam;      // false    — a boolean, not a probability
+lowConfidence;      // ["urgency"] — properties below the threshold
+```
+
+The mapping mirrors Laya's `structured.py`:
+
+| JSON Schema | Question | Notes |
+|---|---|---|
+| `enum: [...]` | `choice` | decoded back to the original value, so numeric enums return numbers |
+| `enum` of all booleans | `noul` | |
+| `type: "boolean"` | `noul` | |
+| `integer`/`number` with `minimum` **and** `maximum` | `score` | shifted by `minimum` on the way back |
+| `const: x` | single-option `choice` | |
+| `["string", "null"]` | unwrapped to its non-null member | |
+
+**It refuses what Laya refuses**, with the same message, before any request:
+
+| Rejected | Why |
+|---|---|
+| free `type: "string"` | a free string cannot be a fixed option set — use `enum` or a boolean |
+| `array` | ask one field per element |
+| nested `object`, `$ref` | flatten the schema |
+| numeric without integer bounds | a score needs `minimum` and `maximum` |
+| more than 255 options / 10 score levels | exceeds Laya's caps |
+
+So a schema accepted here is one the server accepts; nothing fails late.
+
+---
+
 ## Routing
 
 > **Two different things are called "routing". They are unrelated.**
@@ -566,7 +658,7 @@ sales      2.0%         ........................
 |---|---|---|
 | `laya predict <text>` | raw questions in, raw answers out | `/v1/systemone`, verbatim |
 | `laya classify <text>` | assign one label | 1 `choice` question |
-| `laya decide <text>` | several typed questions in one pass | N questions, 1 request |
+| `laya decide <text>` | several typed questions in one pass; `--preset triage` | N questions, 1 request |
 | `laya score <text>` | rate against an ordered rubric | 1 `score` question |
 | `laya screen <text>` | yes/no guardrail checks | N `noul` questions |
 | `laya route <text>` | **reports** which route would be chosen — runs nothing | 1 `choice` question |
@@ -970,6 +1062,7 @@ Request limits are mirrored from the server and checked locally, so an oversized
 | `score({ input, levels, … })` | one `score` question | `ScoreResult` |
 | `screen({ input, checks, flagAt? })` | N `noul` questions; `passed`/`flagged` computed locally | `ScreenResult` |
 | `match({ a, b, … })` | one `choice` question over 3 verdicts *(wording is this SDK's)* | `ChoiceResult & { verdict }` |
+| `decideFromSchema({ input, schema })` | a flat JSON Schema compiled to N questions, **one forward pass** | `{ values, fields, lowConfidence, meta }` |
 | `batch(items, options?)` | **N separate requests**, client-side concurrency | `BatchOutcome[]` |
 | `createRouter({ routes, … })` | one `choice` question + local dispatch | `LayaRouter` |
 | `health()` | `GET /health`, verbatim | `{ status, loaded, device }` |
@@ -984,6 +1077,10 @@ Every method accepts `model`, `threshold`, `timeout` and `signal`.
 ### Builders
 
 `choice(labels, instructions?)` · `score(levels, instructions?)` · `noul(instructions, { whenTrue?, whenFalse? })` · `defineConfig(config)`
+
+`presets.triage()` · `presets.email(categories?)` · `presets.guard()` · `presets.moderation()` · `presets.router()`
+
+`questionsFromJsonSchema(schema)` · `planFromJsonSchema(schema)`
 
 ### Types
 

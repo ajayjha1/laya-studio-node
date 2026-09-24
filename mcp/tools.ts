@@ -1,5 +1,5 @@
 import type { Laya, AnyResult, DecisionSpec } from '../src/index.js';
-import { isLayaError } from '../src/index.js';
+import { isLayaError, PRESET_NAMES, presets } from '../src/index.js';
 import { textResult, type ToolDefinition, type ToolResult } from './protocol.js';
 
 const stateSchema = {
@@ -88,9 +88,17 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object',
       properties: {
         input: stateSchema,
+        preset: {
+          type: 'string',
+          enum: [...PRESET_NAMES],
+          description:
+            'Load a ready-made question set ported verbatim from Laya: triage (support tickets), ' +
+            'email (inbound triage), guard (LLM input guardrails), moderation (content safety), ' +
+            'router (model routing). Can be combined with `decisions`, which take precedence.',
+        },
         decisions: {
           type: 'object',
-          description: 'Decision name -> specification.',
+          description: 'Decision name -> specification. Optional when `preset` is given.',
           additionalProperties: {
             type: 'object',
             properties: {
@@ -116,7 +124,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           maxProperties: 64,
         },
       },
-      required: ['input', 'decisions'],
+      required: ['input'],
       additionalProperties: false,
     },
   },
@@ -337,12 +345,24 @@ export async function callTool(laya: Laya, name: string, args: Args): Promise<To
 
       case 'laya_decide': {
         const input = requireString(args, 'input');
-        const raw = args.decisions;
+        const decisions: Record<string, DecisionSpec> = {};
+
+        // A preset seeds the question set; explicit decisions override it.
+        if (args.preset !== undefined) {
+          const name = args.preset;
+          if (typeof name !== 'string' || !(PRESET_NAMES as readonly string[]).includes(name)) {
+            throw new Error(`"preset" must be one of: ${PRESET_NAMES.join(', ')}`);
+          }
+          Object.assign(decisions, presets[name as (typeof PRESET_NAMES)[number]]());
+        }
+
+        const raw = args.decisions ?? {};
         if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
           throw new Error('"decisions" must be an object of decision specifications.');
         }
-
-        const decisions: Record<string, DecisionSpec> = {};
+        if (Object.keys(raw).length === 0 && Object.keys(decisions).length === 0) {
+          throw new Error('Provide "decisions", a "preset", or both.');
+        }
         for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
           const spec = value as Record<string, unknown>;
           const type = spec.type;

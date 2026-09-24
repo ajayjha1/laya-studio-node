@@ -22,6 +22,9 @@ export type {
   BatchItem,
   BatchOptions,
   BatchOutcome,
+  SchemaDecisionOptions,
+  SchemaDecisionResult,
+  SchemaFieldResult,
 } from './client/laya.js';
 
 export { LayaRouter } from './router/router.js';
@@ -35,6 +38,16 @@ export type {
 } from './router/router.js';
 
 export { choice, score, noul } from './decisions/spec.js';
+export { presets, triage, email, guard, moderation, router, PRESET_NAMES } from './decisions/presets.js';
+export type { PresetDecisions, PresetName } from './decisions/presets.js';
+export {
+  planFromJsonSchema,
+  questionsFromJsonSchema,
+  decodeSchemaAnswer,
+  MAX_OPTIONS,
+  MAX_SCORE_LEVELS,
+} from './decisions/schema.js';
+export type { JsonSchemaObject, JsonSchemaProperty, PlannedField } from './decisions/schema.js';
 export { validateQuestions } from './decisions/validate.js';
 export type {
   ChoiceSpec,
